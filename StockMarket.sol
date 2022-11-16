@@ -119,5 +119,13 @@ contract StockMarket {
         orders[position] = order;
     }
 
+    function getBuyOrders() external  view returns (Order[] memory){
+        return buyOrders;
+    }
+
+    function getSellOrders() external  view returns (Order[] memory){
+        return sellOrders;
+    }
+
     //function freeOrder
 }
