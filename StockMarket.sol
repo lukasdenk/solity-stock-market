@@ -1,10 +1,11 @@
+
+
 contract StockMarket {
 
     struct Order{
         address issuer;
         uint price;
         uint quantity;
-        uint validUntilBlock;
     }
 
     Order[] private buyOrders;
@@ -20,22 +21,18 @@ contract StockMarket {
     }
 
 
-    function buy(uint price, uint quantity, uint validUntilBlock) public payable {
-        require(validUntilBlock >= block.number);
-        require(msg.value==price * quantity);
+    function buy(uint price, uint quantity) public payable  {
+        require(msg.value==price * quantity, "quantity * price must equal msg.value");
 
-        Order memory buyOrder = Order(msg.sender, price, quantity, validUntilBlock);
+        Order memory buyOrder = Order(msg.sender, price, quantity);
 
         while(buyOrder.quantity > 0 && sellOrders.length > 0){
             Order storage sellOrder = sellOrders[sellOrders.length - 1];
-            if(sellOrder.validUntilBlock < block.number){
-                sellOrders.pop();
-                liquidStocks[sellOrder.issuer] += sellOrder.quantity;
-            } else if(sellOrder.price > buyOrder.price){
+            if(sellOrder.price > buyOrder.price){
                 break;
             } else
             {
-                executeOrders(sellOrder, buyOrder, buyOrder.price);
+                executeOrders(sellOrder, buyOrder, sellOrder.price);
                 if(sellOrder.quantity == 0){
                     sellOrders.pop();
                 }
@@ -45,26 +42,23 @@ contract StockMarket {
         if(buyOrder.quantity > 0){
             addToBuyOrders(buyOrder);
         }
+        
     }
 
 
-    function sell(uint price, uint quantity, uint validUntilBlock) public {
-        require(validUntilBlock >= block.number);
+    function sell(uint price, uint quantity) public {
         require(liquidStocks[msg.sender] >= quantity);
 
-        Order memory sellOrder = Order(msg.sender, price, quantity, validUntilBlock);
+        Order memory sellOrder = Order(msg.sender, price, quantity);
         liquidStocks[msg.sender] -= quantity;
 
         while(sellOrder.quantity > 0 && buyOrders.length > 0){
             Order memory buyOrder = buyOrders[buyOrders.length - 1];
-            if(buyOrder.validUntilBlock < block.number){
-                buyOrders.pop();
-                payable (buyOrder.issuer).transfer(buyOrder.price * buyOrder.quantity);
-            } else if(sellOrder.price > buyOrder.price){
+            if(sellOrder.price > buyOrder.price){
                 break;
             } else
             {
-                executeOrders(sellOrder, buyOrder, sellOrder.price);
+                executeOrders(sellOrder, buyOrder, buyOrder.price);
                 if(buyOrder.quantity == 0){
                     buyOrders.pop();
                 }
@@ -82,20 +76,23 @@ contract StockMarket {
 
         buyOrder.quantity -= transferringQuantity;
         liquidStocks[buyOrder.issuer] += transferringQuantity;
+        if(price < buyOrder.price){
+            payable (buyOrder.issuer).transfer(transferringQuantity * (buyOrder.price - price));
+        }
 
         sellOrder.quantity -= transferringQuantity;
         payable (sellOrder.issuer).transfer(transferringQuantity * price);
     }
 
 
-    function min(uint v1, uint v2) internal pure returns (uint){
+    function min(uint v1, uint v2) private  pure returns (uint){
         return v1 < v2 ? v1 : v2;
     }
 
 
     function addToBuyOrders(Order memory order) private {
         uint i = 0;
-        while(i < buyOrders.length || order.price > buyOrders[i].price){
+        while(i < buyOrders.length && order.price > buyOrders[i].price){
             i++;
         }
         addElementToPosition(buyOrders, order, i);
@@ -104,7 +101,7 @@ contract StockMarket {
 
     function addToSellOrders(Order memory order) private {
         uint i = 0;
-        while(i < sellOrders.length || order.price < sellOrders[i].price){
+        while(i < sellOrders.length && order.price < sellOrders[i].price){
             i++;
         }
         addElementToPosition(sellOrders, order, i);
@@ -113,7 +110,7 @@ contract StockMarket {
 
     function addElementToPosition(Order[] storage orders, Order memory order, uint position) private {
         orders.push();
-        for(uint i = orders.length;i>position;i--){
+        for(uint i = orders.length-1;i>position;i--){
             orders[i] = orders[i-1];
         }
         orders[position] = order;
@@ -125,6 +122,10 @@ contract StockMarket {
 
     function getSellOrders() external  view returns (Order[] memory){
         return sellOrders;
+    }
+
+    function getLiquidQuantity(address owner) external view returns(uint) {
+        return liquidStocks[owner];
     }
 
     //function freeOrder
