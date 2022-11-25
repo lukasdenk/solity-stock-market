@@ -8,10 +8,10 @@ contract StockMarket {
         uint quantity;
     }
 
-    Order[] private buyOrders;
-    Order[] private sellOrders;
+    Order[] internal buyOrders;
+    Order[] internal sellOrders;
 
-    mapping(address => uint) liquidStocks;
+    mapping(address => uint) internal liquidStocks;
 
 
     constructor(address[] memory owners, uint[] memory quantities) {
@@ -27,7 +27,7 @@ contract StockMarket {
         Order memory buyOrder = Order(msg.sender, price, quantity);
 
         while(buyOrder.quantity > 0 && sellOrders.length > 0){
-            Order storage sellOrder = sellOrders[sellOrders.length - 1];
+            Order memory sellOrder = sellOrders[sellOrders.length - 1];
             if(sellOrder.price > buyOrder.price){
                 break;
             } else
@@ -76,6 +76,7 @@ contract StockMarket {
 
         buyOrder.quantity -= transferringQuantity;
         liquidStocks[buyOrder.issuer] += transferringQuantity;
+        //send change money back to buyer
         if(price < buyOrder.price){
             payable (buyOrder.issuer).transfer(transferringQuantity * (buyOrder.price - price));
         }
